@@ -1,15 +1,19 @@
 # Article Card Composer Skill
 
-A Spring AI **1.1.7** reference skill for turning article-like text into structured multi-page social card content and deterministic HTML.
+A Spring AI **1.1.7** reference skill for turning article-like text into structured multi-page social cards and deterministic, template-driven HTML.
 
-The repository separates semantic content planning from visual rendering:
+The repository separates semantic planning, template selection, validation, and rendering:
 
 ```
 article / case study / comparison text
                 |
                 v
-       ArticleCardPlanner
-          (LLM only)
+      versioned CardTemplate
+                |
+                +---- content style contract
+                |        |
+                v        v
+       ArticleCardPlanner (LLM)
                 |
                 v
             CardDeck
@@ -19,7 +23,7 @@ article / case study / comparison text
                 |
                 v
         CardHtmlRenderer
-     (deterministic Java)
+     (deterministic Java + exact template)
                 |
                 v
      fixed-size HTML pages
@@ -28,33 +32,97 @@ article / case study / comparison text
  html_to_image (downstream)
 ```
 
-## What this repository contains
+## Why templates are first-class
 
-- `SKILL.md` — coding-agent implementation contract.
-- `skill.yaml` — machine-readable skill metadata.
-- `schemas/` — stable JSON input/output contracts.
-- `src/main/java/` — Spring AI 1.1.7 reference implementation.
-- `src/main/resources/prompts/` — planner prompt.
-- `src/main/resources/article-card/default.css` — replaceable default visual theme.
-- `examples/` — manufacturing case input and expected semantic deck example.
-- `docs/INTEGRATION.md` — how an Agent should integrate this capability into a real Spring AI project.
+A template is not just CSS. One exact template version owns:
+
+- editorial tone and information density;
+- headline / item length targets;
+- allowed and preferred layouts;
+- visual tokens;
+- additive theme CSS;
+- planner guidance;
+- an immutable SHA-256 fingerprint.
+
+The same resolved template object is used by the planner, validator, and renderer. This prevents a common failure mode where the model writes in one style while the renderer uses another.
+
+## Built-in templates
+
+| Template | Style | Good for |
+| --- | --- | --- |
+| `editorial-dark@1.0.0` | premium dark editorial | business cases, insights, knowledge cards |
+| `warm-paper@1.0.0` | warm paper / consulting | stories, methods, human-centered business content |
+| `neo-grid@1.0.0` | high-contrast modern grid | steps, checklists, comparisons, data-heavy cards |
+
+The default is pinned to **`editorial-dark@1.0.0`**. The composer never resolves a moving `latest` alias.
+
+## Stable style across time
+
+For reproducible use:
+
+1. choose `templateId` and `templateVersion`;
+2. persist the returned `template.fingerprint`;
+3. send all three values when regenerating later.
+
+If a provider mutates the content of an existing template version, the fingerprint check fails instead of silently changing the design.
+
+Visual output is deterministic for a fixed `CardDeck + template + dimensions`. LLM wording can still vary across model versions, but the template contract constrains tone, density, layout choice, and length targets.
 
 ## Agent-facing capability
 
-The default tool name is:
+The default tool name remains:
 
 ```
 article_card_composer
 ```
 
-It accepts source content plus optional page/canvas settings and returns:
+New optional inputs:
 
-- a structured `CardDeck` suitable for further workflow processing;
-- deterministic HTML;
-- page count, dimensions, and `.card-page` screenshot selector;
-- validation warnings.
+- `templateId`
+- `templateVersion`
+- `templateFingerprint`
 
-The model does **not** generate the final HTML. It generates only the semantic deck.
+Existing callers that omit them keep working and use the pinned default template.
+
+The result now includes an exact template snapshot:
+
+```json
+{
+  "template": {
+    "id": "editorial-dark",
+    "version": "1.0.0",
+    "fingerprint": "...",
+    "displayName": "Editorial Dark"
+  }
+}
+```
+
+## Extending templates without changing this skill
+
+Implement `CardTemplateProvider` and register it as a Spring bean. A provider may load templates from:
+
+- application code;
+- a database;
+- a Git repository;
+- an internal design-system service;
+- a CMS / configuration service;
+- a future AI-assisted template authoring pipeline.
+
+The core skill only consumes the compiled `CardTemplate` contract. External templates do not need to be committed into this repository.
+
+See [docs/TEMPLATES.md](docs/TEMPLATES.md) for the complete definition, selection, versioning, and future Agent design.
+
+## Repository contents
+
+- `SKILL.md` — coding-agent implementation contract.
+- `skill.yaml` — machine-readable skill metadata.
+- `schemas/` — request/output/template contracts.
+- `src/main/java/` — Spring AI 1.1.7 reference implementation.
+- `src/main/resources/prompts/` — planner prompt.
+- `src/main/resources/article-card/` — structural CSS and built-in theme CSS.
+- `examples/` — manufacturing example.
+- `docs/TEMPLATES.md` — template system and extension model.
+- `docs/INTEGRATION.md` — Spring AI integration guide.
 
 ## Defaults
 
@@ -64,14 +132,7 @@ The model does **not** generate the final HTML. It generates only the semantic d
 - canvas: 1080 × 1440
 - language: zh-CN
 - rewrite: allowed when facts and numeric claims are preserved
-
-## Use in your project
-
-Read [docs/INTEGRATION.md](docs/INTEGRATION.md). In an existing application, keep your current Spring Boot/model-provider setup and register the `ArticleCardTools` bean with the Agent's existing tool registry.
-
-For a coding Agent, the intended instruction is simply:
-
-> Read `SKILL.md` and `docs/INTEGRATION.md`, inspect the host Spring AI 1.1.7 project, and integrate `article_card_composer` using the project's existing Agent/Tool registration mechanism. Do not upgrade Spring AI and do not replace unrelated infrastructure.
+- template: editorial-dark@1.0.0
 
 ## Test
 
@@ -79,4 +140,30 @@ For a coding Agent, the intended instruction is simply:
 mvn test
 ```
 
-The unit tests do not call a remote model. End-to-end planner behavior must be tested inside the host application with its configured `ChatModel`.
+Unit tests do not call a remote model. End-to-end planner behavior should be tested inside the host application with its configured `ChatModel`.
+
+
+## Reproducibility boundaries
+
+Template identity and render identity are intentionally separate.
+
+- `template.fingerprint` uses `card-template-canonical-v1` and covers the compiled template definition.
+- `render.renderFingerprint` uses `card-render-v1` and additionally covers renderer/markup version, structural CSS, dimensions, language, and the template fingerprint.
+- Neither fingerprint guarantees identical LLM wording.
+- Pixel-identical screenshots additionally require a pinned browser/container/font runtime.
+
+For exact regeneration, persist the source or source hash, `CardDeck`, template identity, render fingerprint, and downstream browser/runtime metadata. If exact wording must remain unchanged, reuse the stored `CardDeck` instead of re-running the planner.
+
+The built-in design reference canvas is 1080 × 1440. Other accepted dimensions are not considered visually verified until the downstream browser QA step checks overflow.
+
+## Planner validation and grounding
+
+Planner output gets at most two attempts. A failed structured-output parse, illegal layout/page structure, or an Arabic-numeral claim not present in the source causes one deterministic correction attempt and then fails closed.
+
+This numerical grounding is deliberately narrow: it strengthens amounts/percentages/dates expressed with Arabic numerals, but it is not a general fact-verification system for entities or causal claims.
+
+## Production rendering
+
+The renderer emits an inline Content Security Policy and rejects network-bearing template token/CSS constructs. Production Chromium must still be run with network requests blocked.
+
+Before screenshot export, downstream rendering should wait for fonts and check each page for DOM overflow. See [docs/PRODUCTION.md](docs/PRODUCTION.md).

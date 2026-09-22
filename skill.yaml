@@ -1,24 +1,28 @@
 id: article_card_composer
-version: 1.0.0
+version: 1.1.0
 runtime:
   language: java
   springAi: "1.1.7"
 purpose: >
   Transform article-like source content into a structured multi-page social card deck
-  and deterministic HTML for downstream fixed-size screenshot rendering.
+  and deterministic, versioned-template HTML for downstream fixed-size screenshot rendering.
 entrypoints:
   agentTool:
     name: article_card_composer
     javaType: com.crazycola.html.articlecard.ArticleCardTools
+    returnDirect: true
   service:
     javaType: com.crazycola.html.articlecard.ArticleCardSkill
 contracts:
   request: com.crazycola.html.articlecard.ArticleCardContracts.ArticleCardRequest
   deck: com.crazycola.html.articlecard.ArticleCardContracts.CardDeck
   result: com.crazycola.html.articlecard.ArticleCardContracts.ArticleCardResult
+  template: com.crazycola.html.articlecard.CardTemplate
+  executionContext: com.crazycola.html.articlecard.ArticleCardContracts.CardExecutionContext
 schemas:
   input: schemas/article-card-input.schema.json
   output: schemas/article-card-output.schema.json
+  template: schemas/card-template.schema.json
 defaults:
   minPages: 3
   maxPages: 8
@@ -26,10 +30,30 @@ defaults:
   height: 1440
   language: zh-CN
   allowRewrite: true
+  templateId: editorial-dark
+  templateVersion: "1.0.0"
+templates:
+  selection: deterministic
+  versionPolicy: immutable-semver
+  fingerprint: sha256
+  fingerprintAlgorithm: card-template-canonical-v1
+  providerInterface: com.crazycola.html.articlecard.CardTemplateProvider
+  builtIns:
+    - editorial-dark@1.0.0
+    - warm-paper@1.0.0
+    - neo-grid@1.0.0
+planning:
+  maxAttempts: 2
+  numericalGrounding: strict-arabic-numerals
 rendering:
   pageSelector: .card-page
-  deterministic: true
+  rendererVersion: "1.1.0"
+  markupVersion: card-html-v2
+  renderFingerprintAlgorithm: card-render-v1
+  htmlDeterministicForFixedInputs: true
+  referenceCanvas: 1080x1440
   screenshotResponsibility: downstream
+  downstreamBrowserQaRequired: true
 layouts:
   - headline-list
   - numbered-grid

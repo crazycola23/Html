@@ -1,15 +1,15 @@
 # Integration guide — Spring AI 1.1.7
 
-This repository is intentionally a provider-agnostic reference module. It depends on Spring AI's chat client API but does not choose OpenAI, Anthropic, Ollama, or another model provider.
+This repository is intentionally provider-agnostic. It depends on Spring AI's chat client API but does not choose OpenAI, Anthropic, Ollama, or another model provider.
 
 ## 1. Integrate into an existing project
 
 A coding agent should first inspect the target project and then either:
 
-- copy/adapt the package under `src/main/java/com/crazycola/html/articlecard` plus the two resources; or
+- copy/adapt the package under `src/main/java/com/crazycola/html/articlecard` plus resources; or
 - publish this module internally and depend on it as a library.
 
-Do **not** replace the host project's Spring Boot parent, model provider starter, security configuration, or Agent registry just to use this skill.
+Do not replace the host project's Spring Boot parent, model provider starter, security configuration, or Agent registry just to use this skill.
 
 Import the reference configuration:
 
@@ -20,11 +20,9 @@ class AgentFeatures {
 }
 ```
 
-The configuration needs the host application to already provide a Spring AI `ChatModel` bean.
+The host application must already provide a Spring AI `ChatModel` bean.
 
-## 2. Register the tool with the existing Agent
-
-Declarative registration is the simplest path in Spring AI 1.1.x:
+## 2. Register the tool
 
 ```java
 @Bean
@@ -38,19 +36,63 @@ ChatClient mainAgent(
 }
 ```
 
-If the host already registers other tool objects, add `articleCardTools` to the same registration rather than creating a second Agent.
+If the host already registers other tool objects, add `articleCardTools` to the same registry.
 
-For codebases using explicit callbacks, Spring AI 1.1.x can adapt the same POJO:
+## 3. Template choice
+
+Built-ins:
+
+- `editorial-dark@1.0.0`
+- `warm-paper@1.0.0`
+- `neo-grid@1.0.0`
+
+For repeatable output, provide an exact template:
 
 ```java
-ToolCallback[] callbacks = ToolCallbacks.from(articleCardTools);
+ArticleCardRequest request = new ArticleCardRequest(
+        content,
+        title,
+        4,
+        6,
+        1080,
+        1440,
+        true,
+        "zh-CN",
+        "editorial-dark",
+        "1.0.0",
+        storedFingerprint);
 ```
 
-Then add those callbacks using the host project's existing `toolCallbacks/defaultToolCallbacks` mechanism.
+Persist `result.template()` with the job. On future regeneration, pass its id/version/fingerprint back into the request.
 
-## 3. ToolContext
+Do not build application logic around "latest template".
 
-Runtime metadata belongs in `ToolContext`, not in model-visible arguments:
+## 4. External template providers
+
+Add templates without modifying this module by registering another `CardTemplateProvider` bean.
+
+```java
+@Bean
+CardTemplateProvider brandTemplates(BrandTemplateRepository repository) {
+    return new DatabaseBrandTemplateProvider(repository);
+}
+```
+
+The provider compiles source definitions into validated `CardTemplate` objects. The registry rejects duplicate `id@version` refs.
+
+This allows application-owned, tenant-owned, or remotely managed templates to coexist with the built-in catalog.
+
+## 5. Agent-driven recommendation
+
+Keep recommendation separate from execution.
+
+An Agent can read `CardTemplateRegistry.catalog()` or a richer external catalog, recommend an exact template, then pass the frozen id/version/fingerprint to `article_card_composer`.
+
+This keeps intelligent selection flexible without allowing rendering style to drift inside the composer itself.
+
+## 6. ToolContext
+
+Runtime metadata belongs in `ToolContext`, not model-visible arguments:
 
 ```java
 String response = mainAgent.prompt()
@@ -63,67 +105,108 @@ String response = mainAgent.prompt()
         .content();
 ```
 
-The reference tool deliberately does not serialize these values back into `ArticleCardResult`.
+The reference tool deliberately does not serialize these values into `ArticleCardResult`.
 
-## 4. Typed workflow integration
+## 7. Typed workflow integration
 
-If your orchestration layer already supports typed workflow state, prefer calling the service directly:
+If the orchestration layer already supports typed state, prefer calling the service directly:
 
 ```java
 ArticleCardResult result = articleCardSkill.compose(request);
 workflowState.put("cardDeck", result.deck());
 workflowState.put("cardHtml", result.render().html());
+workflowState.put("cardTemplate", result.template());
 ```
 
-This avoids feeding a potentially large HTML string back into the orchestration LLM.
+This avoids feeding a potentially large HTML string back into an orchestration LLM.
 
 Recommended production flow:
 
 ```
-content/research node
-       |
-       v
+content/research
+      |
+      v
+template recommendation/policy
+      |
+      v
+freeze exact template snapshot
+      |
+      v
 article_card_composer
-       |
-       +--> CardDeck (stable semantic state)
-       |
-       v
+      |
+      +--> CardDeck
+      +--> template snapshot
+      |
+      v
 HTML renderer
-       |
-       v
-html_to_image (separate capability)
-       |
-       v
-publish/storage node
+      |
+      v
+html_to_image
+      |
+      v
+publish/storage
 ```
 
-## 5. Downstream image renderer contract
+## 8. Downstream image renderer
 
-The future image service does not need to understand the article. It only needs:
+The image service only needs:
 
 - `render.html`
 - `render.width`
 - `render.height`
-- `render.pageSelector` (always `.card-page` in v1)
+- `render.pageSelector`
 
-For Playwright/Chromium, load the returned HTML, wait for fonts/assets, enumerate `.card-page`, and screenshot each element separately.
+For Playwright/Chromium, load the HTML, enumerate `.card-page`, and screenshot each element separately.
 
-## 6. Replacing visual style
+Production systems should also detect DOM overflow before export.
 
-The semantic contract is independent of style. Replace:
-
-`src/main/resources/article-card/default.css`
-
-or instantiate `CardHtmlRenderer` with custom CSS. Keep the semantic class names and page dimensions intact.
-
-## 7. Verification checklist
+## 9. Verification checklist
 
 Before merging into a real application:
 
 1. Keep Spring AI at 1.1.7.
-2. Run `mvn test` for this reference module.
-3. Add a host-project test proving the Agent exposes `article_card_composer`.
-4. Run the manufacturing example end-to-end with the host model.
-5. Verify facts and numeric claims remain grounded in the input.
-6. Verify output HTML page count matches `CardDeck.pages.size()`.
-7. Verify existing tools remain registered.
+2. Run `mvn test`.
+3. Verify the Agent exposes `article_card_composer`.
+4. Verify the default template resolves to an exact pinned version.
+5. Persist the returned template snapshot.
+6. Verify fingerprint mismatch fails.
+7. Run each built-in template on representative content.
+8. Verify source facts and numeric claims remain grounded.
+9. Verify output page count matches `CardDeck.pages.size()`.
+10. Verify existing tools remain registered.
+
+
+## 10. Execution context and policy
+
+`ArticleCardTools` maps non-model `ToolContext` keys into `CardExecutionContext`:
+
+- `tenantId`
+- `brandId`
+- `projectId`
+- `userId`
+- `channel`
+- `traceId`
+
+The built-in deterministic selector ignores these values, but a host application can replace `CardTemplateSelector` to enforce tenant/brand/channel policy without adding sensitive policy metadata to model-visible tool parameters.
+
+## 11. Tool result handling
+
+The declarative tool uses `returnDirect = true`. Full HTML is therefore treated as a terminal artifact result rather than being sent through another orchestration-model round trip.
+
+If an Agent must continue reasoning after composition, prefer calling `ArticleCardSkill` from typed workflow state and store HTML outside the LLM context. A larger production system can replace the HTML field at its orchestration boundary with an artifact reference.
+
+## 12. Browser QA contract
+
+The Java renderer guarantees deterministic HTML for fixed Java inputs and render contract. It does not guarantee browser layout or screenshot pixels.
+
+A production Playwright/Chromium step should:
+
+1. run in a pinned container with a pinned Chromium/font set;
+2. deny all network requests;
+3. load the HTML and wait for `document.fonts.ready`;
+4. measure each `.card-page` and important content container;
+5. reject `scrollHeight > clientHeight` or `scrollWidth > clientWidth`;
+6. capture screenshots only after QA passes;
+7. persist browser/container/font/device-scale metadata with the artifact.
+
+1080 × 1440 is the built-in visual QA reference size. Other dimensions produce a warning until they pass downstream browser QA.

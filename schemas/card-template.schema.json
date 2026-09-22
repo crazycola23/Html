@@ -1,0 +1,87 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "card-template.schema.json",
+  "title": "CardTemplateDefinition",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["id", "version", "displayName", "content", "layouts", "visual"],
+  "properties": {
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9-]*$"
+    },
+    "version": {
+      "type": "string",
+      "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)(?:-[0-9A-Za-z.-]+)?(?:\\+[0-9A-Za-z.-]+)?$",
+      "description": "Immutable semantic version. Moving aliases such as latest/current/default/draft are not valid published versions."
+    },
+    "displayName": { "type": "string", "minLength": 1 },
+    "description": { "type": "string", "default": "" },
+    "tags": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 },
+      "uniqueItems": true,
+      "default": []
+    },
+    "content": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "tone",
+        "density",
+        "headlineStyle",
+        "headlineMaxChars",
+        "itemTitleMaxChars",
+        "itemBodyMaxChars"
+      ],
+      "properties": {
+        "tone": { "type": "string", "minLength": 1 },
+        "density": { "type": "string", "minLength": 1 },
+        "headlineStyle": { "type": "string", "minLength": 1 },
+        "headlineMaxChars": { "type": "integer", "minimum": 8 },
+        "itemTitleMaxChars": { "type": "integer", "minimum": 4 },
+        "itemBodyMaxChars": { "type": "integer", "minimum": 8 }
+      }
+    },
+    "layouts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["allowed", "preferred", "maxItemsPerPage"],
+      "properties": {
+        "allowed": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "enum": ["headline-list", "numbered-grid", "statement", "steps", "comparison"]
+          }
+        },
+        "preferred": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "enum": ["headline-list", "numbered-grid", "statement", "steps", "comparison"]
+          }
+        },
+        "maxItemsPerPage": { "type": "integer", "minimum": 0, "maximum": 6 }
+      }
+    },
+    "visual": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["tokens"],
+      "properties": {
+        "tokens": {
+          "type": "object",
+          "additionalProperties": { "type": "string" },
+          "description": "Compiled CSS token values. Runtime rejects network-loading constructs and declaration breakout characters."
+        },
+        "css": {
+          "type": "string",
+          "description": "Optional additive self-contained CSS. Runtime rejects at-rules, url/network constructs, backslash escapes and style-tag breakout."
+        }
+      }
+    },
+    "plannerGuidance": { "type": "string", "default": "" }
+  }
+}

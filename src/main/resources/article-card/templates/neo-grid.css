@@ -1,0 +1,20 @@
+.card-page{
+  background:
+    linear-gradient(rgba(17,20,17,.06) 1px,transparent 1px),
+    linear-gradient(90deg,rgba(17,20,17,.06) 1px,transparent 1px),
+    var(--ac-bg);
+  background-size:52px 52px
+}
+.card-page::after{
+  width:220px;height:220px;border:0;border-radius:0;
+  background:var(--ac-accent);right:-88px;top:-92px;opacity:1;transform:rotate(8deg)
+}
+.card-meta{border-bottom:2px solid var(--ac-border);color:var(--ac-text);font-weight:800}
+.page-number{background:var(--ac-accent);padding:8px 12px;color:#0b0d0b}
+.headline{font-weight:900;letter-spacing:-.045em}
+.card-item{
+  border:2px solid var(--ac-border);
+  box-shadow:8px 8px 0 var(--ac-border)
+}
+.item-number{color:var(--ac-text);background:var(--ac-accent);display:inline-block;padding:7px 9px;width:max-content}
+.summary{border-top:2px solid var(--ac-border);color:var(--ac-text);font-weight:650}
