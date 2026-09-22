@@ -19,6 +19,11 @@ public class ArticleCardSkillConfiguration {
     }
 
     @Bean
+    GroundingValidator groundingValidator() {
+        return new GroundingValidator();
+    }
+
+    @Bean
     CardHtmlRenderer cardHtmlRenderer() {
         return new CardHtmlRenderer();
     }
@@ -42,9 +47,10 @@ public class ArticleCardSkillConfiguration {
     ArticleCardSkill articleCardSkill(
             ArticleCardPlanner planner,
             CardDeckValidator validator,
+            GroundingValidator groundingValidator,
             CardHtmlRenderer renderer,
             CardTemplateSelector templateSelector) {
-        return new ArticleCardSkill(planner, validator, renderer, templateSelector);
+        return new ArticleCardSkill(planner, validator, groundingValidator, renderer, templateSelector);
     }
 
     @Bean

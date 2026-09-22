@@ -7,22 +7,31 @@ import com.crazycola.html.articlecard.ArticleCardContracts.RenderResult;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.HexFormat;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.TreeMap;
 
 public final class CardHtmlRenderer {
 
     public static final String PAGE_SELECTOR = ".card-page";
+    public static final String RENDERER_VERSION = "1.1.0";
+    public static final String MARKUP_VERSION = "card-html-v2";
+    public static final String RENDER_FINGERPRINT_ALGORITHM = "card-render-v1";
 
     private final String baseCss;
+    private final String structuralCssFingerprint;
 
     public CardHtmlRenderer() {
         this(loadDefaultCss());
     }
 
     public CardHtmlRenderer(String baseCss) {
-        this.baseCss = baseCss == null ? "" : baseCss;
+        this.baseCss = normalizeLineEndings(baseCss == null ? "" : baseCss);
+        this.structuralCssFingerprint = sha256(this.baseCss);
     }
 
     public RenderResult render(CardDeck deck, int width, int height, String language) {
@@ -36,12 +45,16 @@ public final class CardHtmlRenderer {
             String language,
             CardTemplate template) {
 
+        String renderFingerprint = renderFingerprint(width, height, language, template);
         StringBuilder html = new StringBuilder(24_576);
         html.append("<!doctype html>\n<html lang=\"")
                 .append(escapeAttribute(language))
                 .append("\">\n<head>\n")
                 .append("<meta charset=\"UTF-8\">\n")
                 .append("<meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">\n")
+                .append("<meta http-equiv=\"Content-Security-Policy\" content=\"default-src 'none'; ")
+                .append("style-src 'unsafe-inline'; img-src data: blob:; font-src data:; ")
+                .append("connect-src 'none'; media-src 'none'; object-src 'none'; frame-src 'none'\">\n")
                 .append("<style>\n")
                 .append(":root{--card-width:").append(width).append("px;--card-height:")
                 .append(height).append("px;");
@@ -59,9 +72,11 @@ public final class CardHtmlRenderer {
                 .append(escapeAttribute(template.ref()))
                 .append("\" data-template-fingerprint=\"")
                 .append(escapeAttribute(template.fingerprint()))
+                .append("\" data-render-fingerprint=\"")
+                .append(renderFingerprint)
                 .append("\">\n");
 
-        List<CardPage> pages = deck.pages() == null ? List.of() : deck.pages();
+        List<CardPage> pages = deck.pages();
         for (int i = 0; i < pages.size(); i++) {
             appendPage(html, pages.get(i), i + 1, pages.size(), deck.deckTitle());
         }
@@ -73,7 +88,21 @@ public final class CardHtmlRenderer {
                 height,
                 pages.size(),
                 PAGE_SELECTOR,
-                html.toString());
+                html.toString(),
+                renderFingerprint);
+    }
+
+    public String renderFingerprint(int width, int height, String language, CardTemplate template) {
+        String canonical = String.join("\n",
+                RENDER_FINGERPRINT_ALGORITHM,
+                "renderer=" + RENDERER_VERSION,
+                "markup=" + MARKUP_VERSION,
+                "structuralCss=" + structuralCssFingerprint,
+                "template=" + template.fingerprint(),
+                "width=" + width,
+                "height=" + height,
+                "language=" + (language == null ? "" : language));
+        return sha256(canonical);
     }
 
     private static void appendPage(
@@ -97,9 +126,9 @@ public final class CardHtmlRenderer {
                 .append(escapeHtml(deckTitle == null ? "" : deckTitle))
                 .append("</span>\n")
                 .append("<span class=\"page-number\">")
-                .append(String.format("%02d", pageIndex))
+                .append(String.format(Locale.ROOT, "%02d", pageIndex))
                 .append(" / ")
-                .append(String.format("%02d", totalPages))
+                .append(String.format(Locale.ROOT, "%02d", totalPages))
                 .append("</span>\n")
                 .append("</header>\n");
 
@@ -107,7 +136,7 @@ public final class CardHtmlRenderer {
         appendText(html, "headline", page.headline(), "h1");
         appendText(html, "subheadline", page.subheadline(), "p");
 
-        List<CardItem> items = page.items() == null ? List.of() : page.items();
+        List<CardItem> items = page.items();
         if (!items.isEmpty()) {
             html.append("<div class=\"card-items\">\n");
             for (CardItem item : items) {
@@ -153,6 +182,21 @@ public final class CardHtmlRenderer {
 
     private static String escapeAttribute(String value) {
         return escapeHtml(value == null ? "" : value);
+    }
+
+    private static String normalizeLineEndings(String value) {
+        return value.replace("\r\n", "\n").replace('\r', '\n');
+    }
+
+    private static String sha256(String value) {
+        try {
+            byte[] digest = MessageDigest.getInstance("SHA-256")
+                    .digest(value.getBytes(StandardCharsets.UTF_8));
+            return HexFormat.of().formatHex(digest);
+        }
+        catch (NoSuchAlgorithmException e) {
+            throw new IllegalStateException("SHA-256 is unavailable", e);
+        }
     }
 
     private static String loadDefaultCss() {

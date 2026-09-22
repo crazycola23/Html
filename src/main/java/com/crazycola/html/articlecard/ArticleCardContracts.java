@@ -76,6 +76,32 @@ public final class ArticleCardContracts {
         }
     }
 
+    public record CardExecutionContext(
+            String tenantId,
+            String brandId,
+            String projectId,
+            String userId,
+            String channel,
+            String traceId) {
+
+        public CardExecutionContext {
+            tenantId = blankToNull(tenantId);
+            brandId = blankToNull(brandId);
+            projectId = blankToNull(projectId);
+            userId = blankToNull(userId);
+            channel = blankToNull(channel);
+            traceId = blankToNull(traceId);
+        }
+
+        public static CardExecutionContext empty() {
+            return new CardExecutionContext(null, null, null, null, null, null);
+        }
+
+        private static String blankToNull(String value) {
+            return value == null || value.isBlank() ? null : value.trim();
+        }
+    }
+
     public record CardItem(
             String number,
             String title,
@@ -91,18 +117,31 @@ public final class ArticleCardContracts {
             String subheadline,
             List<CardItem> items,
             String summary) {
+
+        public CardPage {
+            items = List.copyOf(items == null ? List.of() : items);
+        }
     }
 
     public record CardDeck(
             String deckTitle,
             List<CardPage> pages) {
+
+        public CardDeck {
+            pages = List.copyOf(pages == null ? List.of() : pages);
+        }
     }
 
     public record TemplateSnapshot(
             String id,
             String version,
             String fingerprint,
-            String displayName) {
+            String displayName,
+            String fingerprintAlgorithm) {
+
+        public TemplateSnapshot(String id, String version, String fingerprint, String displayName) {
+            this(id, version, fingerprint, displayName, null);
+        }
     }
 
     public record RenderResult(
@@ -110,7 +149,12 @@ public final class ArticleCardContracts {
             int height,
             int pageCount,
             String pageSelector,
-            String html) {
+            String html,
+            String renderFingerprint) {
+
+        public RenderResult(int width, int height, int pageCount, String pageSelector, String html) {
+            this(width, height, pageCount, pageSelector, html, null);
+        }
     }
 
     public record ArticleCardResult(
@@ -120,5 +164,18 @@ public final class ArticleCardContracts {
             CardDeck deck,
             RenderResult render,
             List<String> warnings) {
+
+        public ArticleCardResult {
+            warnings = List.copyOf(warnings == null ? List.of() : warnings);
+        }
+
+        public ArticleCardResult(
+                String skill,
+                String skillVersion,
+                CardDeck deck,
+                RenderResult render,
+                List<String> warnings) {
+            this(skill, skillVersion, null, deck, render, warnings);
+        }
     }
 }

@@ -162,3 +162,31 @@ Integration is complete only when:
 - Built-in templates render distinct visual systems.
 - Unit tests pass.
 - Existing agent tools continue to work.
+
+
+## Reproducibility contract
+
+Template identity is not the entire rendering identity.
+
+- `template.fingerprint`: `card-template-canonical-v1`, covering the compiled editorial/layout/visual template.
+- `render.renderFingerprint`: `card-render-v1`, covering renderer version, markup version, structural CSS, dimensions, language, and template fingerprint.
+- LLM output is constrained but not deterministic.
+- Screenshot pixels require a pinned browser/font/container runtime.
+
+Do not promise pixel-level regeneration from template id/version/fingerprint alone.
+
+## Planner failure handling
+
+Planning is bounded to two attempts. Structured-output or deterministic deck/grounding validation failure is fed back once as a correction. After the second invalid result the skill fails closed.
+
+Arabic-numeral claims emitted in deck content must already occur in source material. Presentation sequence labels such as item `01`, `02` are excluded from this check. This is a narrow numerical grounding guard, not general factual verification.
+
+## Execution context
+
+Tenant/brand/project/user/channel/trace metadata belongs in `CardExecutionContext`, normally populated from Spring AI `ToolContext`. A policy-aware host selector may use this context before the exact template is frozen.
+
+## Downstream rendering requirement
+
+1080 × 1440 is the built-in QA reference canvas. Other accepted dimensions require downstream browser overflow validation.
+
+The screenshot service must pin browser/fonts, deny network access, wait for fonts, inspect DOM overflow, and only then export images. Do not use character-count warnings as the final overflow decision.

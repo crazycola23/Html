@@ -2,6 +2,8 @@ package com.crazycola.html.articlecard;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.crazycola.html.articlecard.ArticleCardContracts.CardDeck;
@@ -14,7 +16,7 @@ import org.junit.jupiter.api.Test;
 class CardHtmlRendererTest {
 
     @Test
-    void rendersFixedPagesAndEscapesSourceText() {
+    void rendersFixedPagesEscapesSourceTextAndAddsSecurityMetadata() {
         CardDeck deck = new CardDeck(
                 "demo",
                 List.of(
@@ -42,11 +44,27 @@ class CardHtmlRendererTest {
         assertEquals(1440, result.height());
         assertEquals(2, result.pageCount());
         assertEquals(".card-page", result.pageSelector());
+        assertNotNull(result.renderFingerprint());
+        assertEquals(64, result.renderFingerprint().length());
 
         assertEquals(2, occurrences(result.html(), "class=\"card-page\""));
         assertTrue(result.html().contains("利润 &lt; 风险 &amp; 现金"));
         assertTrue(result.html().contains("&quot;不要猜数字&quot;"));
         assertFalse(result.html().contains("利润 < 风险"));
+        assertTrue(result.html().contains("Content-Security-Policy"));
+        assertTrue(result.html().contains("data-render-fingerprint=\"" + result.renderFingerprint() + "\""));
+    }
+
+    @Test
+    void renderFingerprintChangesWhenStructuralCssChanges() {
+        CardTemplate template = BuiltInCardTemplateProvider.editorialDark();
+
+        String first = new CardHtmlRenderer("body{}")
+                .renderFingerprint(1080, 1440, "zh-CN", template);
+        String second = new CardHtmlRenderer("body{margin:1px}")
+                .renderFingerprint(1080, 1440, "zh-CN", template);
+
+        assertNotEquals(first, second);
     }
 
     private int occurrences(String value, String needle) {

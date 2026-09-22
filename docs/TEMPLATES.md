@@ -287,3 +287,42 @@ Useful future capabilities:
 - promotion workflow: draft -> review -> immutable published version.
 
 The important boundary is that AI may **author or recommend** templates, but published template execution resolves an exact immutable version before generation.
+
+
+---
+
+## 8. Fingerprint canonicalization
+
+Published templates use `card-template-canonical-v1`.
+
+The runtime does not hash Java `toString()` output. It creates an explicit length-prefixed canonical representation, normalizes line endings and Unicode NFC, sorts unordered collections (tags, allowed layouts, token maps), and preserves ordered collections where order is semantic (preferred layouts).
+
+The fingerprint identifies the compiled template definition only. It does not include the shared structural CSS or renderer implementation; those are represented by the separate render fingerprint.
+
+Moving version aliases such as `latest`, `current`, `default`, or `draft` are not valid published template versions. Runtime template IDs and versions are validated independently of the JSON schema.
+
+## 9. CSS trust boundary
+
+`CardTemplate` rejects style-tag breakout, at-rules, backslash escapes, URL/network schemes and common resource-loading constructs in additive CSS. Token values are also prevented from introducing declarations or network resources.
+
+This is defense in depth, not a claim that arbitrary untrusted CSS is a safe public authoring language. A production template-authoring system should compile a restricted/typed template source into a published `CardTemplate`, and the screenshot browser must deny network access.
+
+AI-authored templates should enter the lifecycle as draft source:
+
+```
+draft -> schema/policy validation -> render QA -> human/policy approval -> immutable publish
+```
+
+The authoring Agent should never publish raw CSS directly into the production registry.
+
+## 10. Style reproducibility levels
+
+Do not use "same style" as one undifferentiated guarantee:
+
+- same template definition: enforced by template fingerprint;
+- same HTML rendering contract: strengthened by render fingerprint;
+- same browser layout: requires pinned fonts and Chromium runtime;
+- same LLM wording: not guaranteed;
+- same screenshot pixels: requires pinned container/browser/fonts/device scale and screenshot options.
+
+For exact historical regeneration, store the generated `CardDeck` as an artifact instead of assuming a future model call will reproduce it.

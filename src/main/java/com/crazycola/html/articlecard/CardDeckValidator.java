@@ -29,10 +29,19 @@ public final class CardDeckValidator {
         }
 
         List<String> warnings = new ArrayList<>();
+        if (request.width() != 1080 || request.height() != 1440) {
+            warnings.add("canvas " + request.width() + "x" + request.height()
+                    + " is not the built-in QA reference size 1080x1440; downstream browser overflow validation is required");
+        }
+
         for (int i = 0; i < count; i++) {
             CardPage page = deck.pages().get(i);
             if (page == null) {
                 throw new IllegalArgumentException("page " + (i + 1) + " must not be null");
+            }
+            if (page.index() != null && page.index() != i + 1) {
+                throw new IllegalArgumentException(
+                        "page " + (i + 1) + " index must equal its 1-based list position");
             }
             if (page.headline() == null || page.headline().isBlank()) {
                 throw new IllegalArgumentException("page " + (i + 1) + " headline must not be blank");
@@ -43,7 +52,7 @@ public final class CardDeckValidator {
                                 + template.ref() + ": " + page.layout());
             }
 
-            List<CardItem> items = page.items() == null ? List.of() : page.items();
+            List<CardItem> items = page.items();
             if (items.size() > template.layouts().maxItemsPerPage()) {
                 throw new IllegalArgumentException(
                         "page " + (i + 1) + " has more than "

@@ -141,3 +141,29 @@ mvn test
 ```
 
 Unit tests do not call a remote model. End-to-end planner behavior should be tested inside the host application with its configured `ChatModel`.
+
+
+## Reproducibility boundaries
+
+Template identity and render identity are intentionally separate.
+
+- `template.fingerprint` uses `card-template-canonical-v1` and covers the compiled template definition.
+- `render.renderFingerprint` uses `card-render-v1` and additionally covers renderer/markup version, structural CSS, dimensions, language, and the template fingerprint.
+- Neither fingerprint guarantees identical LLM wording.
+- Pixel-identical screenshots additionally require a pinned browser/container/font runtime.
+
+For exact regeneration, persist the source or source hash, `CardDeck`, template identity, render fingerprint, and downstream browser/runtime metadata. If exact wording must remain unchanged, reuse the stored `CardDeck` instead of re-running the planner.
+
+The built-in design reference canvas is 1080 × 1440. Other accepted dimensions are not considered visually verified until the downstream browser QA step checks overflow.
+
+## Planner validation and grounding
+
+Planner output gets at most two attempts. A failed structured-output parse, illegal layout/page structure, or an Arabic-numeral claim not present in the source causes one deterministic correction attempt and then fails closed.
+
+This numerical grounding is deliberately narrow: it strengthens amounts/percentages/dates expressed with Arabic numerals, but it is not a general fact-verification system for entities or causal claims.
+
+## Production rendering
+
+The renderer emits an inline Content Security Policy and rejects network-bearing template token/CSS constructs. Production Chromium must still be run with network requests blocked.
+
+Before screenshot export, downstream rendering should wait for fonts and check each page for DOM overflow. See [docs/PRODUCTION.md](docs/PRODUCTION.md).

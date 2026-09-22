@@ -6,13 +6,14 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import com.crazycola.html.articlecard.ArticleCardContracts.CardDeck;
 import com.crazycola.html.articlecard.ArticleCardContracts.CardItem;
 import com.crazycola.html.articlecard.ArticleCardContracts.CardPage;
+import com.crazycola.html.articlecard.ArticleCardContracts.RenderResult;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 
 class TemplateConsistencyTest {
 
     @Test
-    void sameTemplateProducesSameHtmlAndCarriesStyleIdentity() {
+    void sameTemplateProducesSameHtmlAndCarriesStyleAndRenderIdentity() {
         CardTemplate template = BuiltInCardTemplateProvider.neoGrid();
         CardDeck deck = new CardDeck(
                 "运营复盘",
@@ -28,11 +29,13 @@ class TemplateConsistencyTest {
                         "结论先于装饰。")));
 
         CardHtmlRenderer renderer = new CardHtmlRenderer();
-        String first = renderer.render(deck, 1080, 1440, "zh-CN", template).html();
-        String second = renderer.render(deck, 1080, 1440, "zh-CN", template).html();
+        RenderResult first = renderer.render(deck, 1080, 1440, "zh-CN", template);
+        RenderResult second = renderer.render(deck, 1080, 1440, "zh-CN", template);
 
-        assertEquals(first, second);
-        assertTrue(first.contains("data-template=\"neo-grid@1.0.0\""));
-        assertTrue(first.contains("data-template-fingerprint=\"" + template.fingerprint() + "\""));
+        assertEquals(first.html(), second.html());
+        assertEquals(first.renderFingerprint(), second.renderFingerprint());
+        assertTrue(first.html().contains("data-template=\"neo-grid@1.0.0\""));
+        assertTrue(first.html().contains("data-template-fingerprint=\"" + template.fingerprint() + "\""));
+        assertTrue(first.html().contains("data-render-fingerprint=\"" + first.renderFingerprint() + "\""));
     }
 }

@@ -9,12 +9,13 @@
     "skillVersion": { "type": "string" },
     "template": {
       "type": "object",
-      "required": ["id", "version", "fingerprint", "displayName"],
+      "required": ["id", "version", "fingerprint", "displayName", "fingerprintAlgorithm"],
       "properties": {
         "id": { "type": "string" },
         "version": { "type": "string" },
         "fingerprint": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
-        "displayName": { "type": "string" }
+        "displayName": { "type": "string" },
+        "fingerprintAlgorithm": { "const": "card-template-canonical-v1" }
       }
     },
     "deck": {
@@ -57,13 +58,14 @@
     },
     "render": {
       "type": "object",
-      "required": ["width", "height", "pageCount", "pageSelector", "html"],
+      "required": ["width", "height", "pageCount", "pageSelector", "html", "renderFingerprint"],
       "properties": {
         "width": { "type": "integer" },
         "height": { "type": "integer" },
         "pageCount": { "type": "integer" },
         "pageSelector": { "const": ".card-page" },
-        "html": { "type": "string" }
+        "html": { "type": "string" },
+        "renderFingerprint": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
       }
     },
     "warnings": {

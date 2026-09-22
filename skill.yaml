@@ -10,6 +10,7 @@ entrypoints:
   agentTool:
     name: article_card_composer
     javaType: com.crazycola.html.articlecard.ArticleCardTools
+    returnDirect: true
   service:
     javaType: com.crazycola.html.articlecard.ArticleCardSkill
 contracts:
@@ -17,6 +18,7 @@ contracts:
   deck: com.crazycola.html.articlecard.ArticleCardContracts.CardDeck
   result: com.crazycola.html.articlecard.ArticleCardContracts.ArticleCardResult
   template: com.crazycola.html.articlecard.CardTemplate
+  executionContext: com.crazycola.html.articlecard.ArticleCardContracts.CardExecutionContext
 schemas:
   input: schemas/article-card-input.schema.json
   output: schemas/article-card-output.schema.json
@@ -32,17 +34,26 @@ defaults:
   templateVersion: "1.0.0"
 templates:
   selection: deterministic
-  versionPolicy: immutable
+  versionPolicy: immutable-semver
   fingerprint: sha256
+  fingerprintAlgorithm: card-template-canonical-v1
   providerInterface: com.crazycola.html.articlecard.CardTemplateProvider
   builtIns:
     - editorial-dark@1.0.0
     - warm-paper@1.0.0
     - neo-grid@1.0.0
+planning:
+  maxAttempts: 2
+  numericalGrounding: strict-arabic-numerals
 rendering:
   pageSelector: .card-page
-  deterministic: true
+  rendererVersion: "1.1.0"
+  markupVersion: card-html-v2
+  renderFingerprintAlgorithm: card-render-v1
+  htmlDeterministicForFixedInputs: true
+  referenceCanvas: 1080x1440
   screenshotResponsibility: downstream
+  downstreamBrowserQaRequired: true
 layouts:
   - headline-list
   - numbered-grid

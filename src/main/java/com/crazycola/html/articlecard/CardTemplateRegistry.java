@@ -6,6 +6,7 @@ import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 
 public final class CardTemplateRegistry {
 
@@ -17,8 +18,10 @@ public final class CardTemplateRegistry {
         Map<String, String> defaults = new LinkedHashMap<>();
 
         for (CardTemplateProvider provider : providers == null ? List.<CardTemplateProvider>of() : providers) {
+            Objects.requireNonNull(provider, "template provider");
             if (provider.templates() != null) {
                 for (CardTemplate template : provider.templates()) {
+                    Objects.requireNonNull(template, "template provider returned null template");
                     String ref = template.ref();
                     CardTemplate existing = templates.putIfAbsent(ref, template);
                     if (existing != null) {
@@ -26,11 +29,15 @@ public final class CardTemplateRegistry {
                     }
                 }
             }
-            for (Map.Entry<String, String> entry : provider.defaultVersions().entrySet()) {
-                String existing = defaults.putIfAbsent(entry.getKey(), entry.getValue());
-                if (existing != null && !existing.equals(entry.getValue())) {
-                    throw new IllegalArgumentException(
-                            "conflicting default template versions for " + entry.getKey());
+
+            Map<String, String> providerDefaults = provider.defaultVersions();
+            if (providerDefaults != null) {
+                for (Map.Entry<String, String> entry : providerDefaults.entrySet()) {
+                    String existing = defaults.putIfAbsent(entry.getKey(), entry.getValue());
+                    if (existing != null && !existing.equals(entry.getValue())) {
+                        throw new IllegalArgumentException(
+                                "conflicting default template versions for " + entry.getKey());
+                    }
                 }
             }
         }
@@ -51,12 +58,19 @@ public final class CardTemplateRegistry {
     }
 
     public CardTemplate resolve(String templateId, String templateVersion, String expectedFingerprint) {
-        String id = templateId == null || templateId.isBlank()
-                ? BuiltInCardTemplateProvider.DEFAULT_TEMPLATE_ID
-                : templateId.trim();
+        boolean hasId = templateId != null && !templateId.isBlank();
+        boolean hasVersion = templateVersion != null && !templateVersion.isBlank();
+
+        if (!hasId && hasVersion) {
+            throw new IllegalArgumentException("templateId is required when templateVersion is supplied");
+        }
+
+        String id = hasId
+                ? templateId.trim()
+                : BuiltInCardTemplateProvider.DEFAULT_TEMPLATE_ID;
 
         String version;
-        if (templateVersion == null || templateVersion.isBlank()) {
+        if (!hasVersion) {
             version = defaultVersions.get(id);
             if (version == null) {
                 throw new IllegalArgumentException(

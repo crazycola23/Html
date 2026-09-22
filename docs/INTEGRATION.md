@@ -174,3 +174,39 @@ Before merging into a real application:
 8. Verify source facts and numeric claims remain grounded.
 9. Verify output page count matches `CardDeck.pages.size()`.
 10. Verify existing tools remain registered.
+
+
+## 10. Execution context and policy
+
+`ArticleCardTools` maps non-model `ToolContext` keys into `CardExecutionContext`:
+
+- `tenantId`
+- `brandId`
+- `projectId`
+- `userId`
+- `channel`
+- `traceId`
+
+The built-in deterministic selector ignores these values, but a host application can replace `CardTemplateSelector` to enforce tenant/brand/channel policy without adding sensitive policy metadata to model-visible tool parameters.
+
+## 11. Tool result handling
+
+The declarative tool uses `returnDirect = true`. Full HTML is therefore treated as a terminal artifact result rather than being sent through another orchestration-model round trip.
+
+If an Agent must continue reasoning after composition, prefer calling `ArticleCardSkill` from typed workflow state and store HTML outside the LLM context. A larger production system can replace the HTML field at its orchestration boundary with an artifact reference.
+
+## 12. Browser QA contract
+
+The Java renderer guarantees deterministic HTML for fixed Java inputs and render contract. It does not guarantee browser layout or screenshot pixels.
+
+A production Playwright/Chromium step should:
+
+1. run in a pinned container with a pinned Chromium/font set;
+2. deny all network requests;
+3. load the HTML and wait for `document.fonts.ready`;
+4. measure each `.card-page` and important content container;
+5. reject `scrollHeight > clientHeight` or `scrollWidth > clientWidth`;
+6. capture screenshots only after QA passes;
+7. persist browser/container/font/device-scale metadata with the artifact.
+
+1080 × 1440 is the built-in visual QA reference size. Other dimensions produce a warning until they pass downstream browser QA.

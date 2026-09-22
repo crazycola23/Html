@@ -4,6 +4,8 @@ import com.crazycola.html.articlecard.ArticleCardContracts.TemplateSnapshot;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.text.Normalizer;
+import java.util.ArrayList;
 import java.util.HexFormat;
 import java.util.List;
 import java.util.Locale;
@@ -12,6 +14,7 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
+import java.util.regex.Pattern;
 
 public record CardTemplate(
         String id,
@@ -25,33 +28,44 @@ public record CardTemplate(
         String css,
         String plannerGuidance) {
 
+    public static final String FINGERPRINT_ALGORITHM = "card-template-canonical-v1";
+
+    private static final Pattern ID_PATTERN = Pattern.compile("^[a-z0-9][a-z0-9-]*$");
+    private static final Pattern VERSION_PATTERN = Pattern.compile(
+            "^(0|[1-9]\\d*)\\.(0|[1-9]\\d*)\\.(0|[1-9]\\d*)"
+                    + "(?:-[0-9A-Za-z.-]+)?(?:\\+[0-9A-Za-z.-]+)?$");
+    private static final Set<String> FORBIDDEN_VERSION_ALIASES = Set.of(
+            "latest", "current", "default", "draft", "head");
+
     public CardTemplate {
         id = requireText(id, "id");
         version = requireText(version, "version");
         displayName = requireText(displayName, "displayName");
         description = description == null ? "" : description.trim();
-        tags = List.copyOf(tags == null ? List.of() : tags);
+        tags = normalizeTags(tags);
         content = Objects.requireNonNull(content, "content");
         layouts = Objects.requireNonNull(layouts, "layouts");
         tokens = Map.copyOf(tokens == null ? Map.of() : tokens);
-        css = css == null ? "" : css;
+        css = normalizeLineEndings(css == null ? "" : css);
         plannerGuidance = plannerGuidance == null ? "" : plannerGuidance.trim();
+
+        if (!ID_PATTERN.matcher(id).matches()) {
+            throw new IllegalArgumentException("template id must match " + ID_PATTERN.pattern() + ": " + id);
+        }
+        if (!VERSION_PATTERN.matcher(version).matches()
+                || FORBIDDEN_VERSION_ALIASES.contains(version.toLowerCase(Locale.ROOT))) {
+            throw new IllegalArgumentException("template version must be an immutable semantic version: " + version);
+        }
 
         for (Map.Entry<String, String> entry : tokens.entrySet()) {
             if (!entry.getKey().matches("[a-z0-9-]+")) {
                 throw new IllegalArgumentException("invalid template token name: " + entry.getKey());
             }
             String value = Objects.requireNonNull(entry.getValue(), "template token value");
-            if (value.contains(";") || value.contains("{") || value.contains("}")
-                    || value.toLowerCase(Locale.ROOT).contains("</style")) {
-                throw new IllegalArgumentException("unsafe template token value for " + entry.getKey());
-            }
+            assertSafeCssFragment(value, "template token " + entry.getKey(), false);
         }
 
-        String lowerCss = css.toLowerCase(Locale.ROOT);
-        if (lowerCss.contains("</style") || lowerCss.contains("@import") || lowerCss.contains("url(")) {
-            throw new IllegalArgumentException("template css must be self-contained and must not load external resources");
-        }
+        assertSafeCssFragment(css, "template css", true);
     }
 
     public String ref() {
@@ -59,31 +73,11 @@ public record CardTemplate(
     }
 
     public String fingerprint() {
-        String canonical = String.join("\n",
-                id,
-                version,
-                displayName,
-                description,
-                String.join(",", tags),
-                content.toString(),
-                new TreeSet<>(layouts.allowedLayouts()).toString(),
-                layouts.preferredLayouts().toString(),
-                Integer.toString(layouts.maxItemsPerPage()),
-                new TreeMap<>(tokens).toString(),
-                css,
-                plannerGuidance);
-        try {
-            byte[] digest = MessageDigest.getInstance("SHA-256")
-                    .digest(canonical.getBytes(StandardCharsets.UTF_8));
-            return HexFormat.of().formatHex(digest);
-        }
-        catch (NoSuchAlgorithmException e) {
-            throw new IllegalStateException("SHA-256 is unavailable", e);
-        }
+        return sha256(canonicalDefinition());
     }
 
     public TemplateSnapshot snapshot() {
-        return new TemplateSnapshot(id, version, fingerprint(), displayName);
+        return new TemplateSnapshot(id, version, fingerprint(), displayName, FINGERPRINT_ALGORITHM);
     }
 
     public String plannerStyleContract() {
@@ -91,6 +85,7 @@ public record CardTemplate(
                 TEMPLATE STYLE CONTRACT (mandatory):
                 - templateRef: %s
                 - templateFingerprint: %s
+                - fingerprintAlgorithm: %s
                 - tone: %s
                 - density: %s
                 - headlineStyle: %s
@@ -108,6 +103,7 @@ public record CardTemplate(
                 """.formatted(
                 ref(),
                 fingerprint(),
+                FINGERPRINT_ALGORITHM,
                 content.tone(),
                 content.density(),
                 content.headlineStyle(),
@@ -118,6 +114,113 @@ public record CardTemplate(
                 new TreeSet<>(layouts.allowedLayouts()),
                 layouts.preferredLayouts(),
                 plannerGuidance.isBlank() ? "(none)" : plannerGuidance);
+    }
+
+    private String canonicalDefinition() {
+        StringBuilder out = new StringBuilder(4096);
+        appendCanonical(out, "algorithm", FINGERPRINT_ALGORITHM);
+        appendCanonical(out, "id", id);
+        appendCanonical(out, "version", version);
+        appendCanonical(out, "displayName", displayName);
+        appendCanonical(out, "description", description);
+
+        List<String> canonicalTags = new ArrayList<>(tags);
+        canonicalTags.sort(String::compareTo);
+        appendCanonical(out, "tags.count", Integer.toString(canonicalTags.size()));
+        for (int i = 0; i < canonicalTags.size(); i++) {
+            appendCanonical(out, "tags." + i, canonicalTags.get(i));
+        }
+
+        appendCanonical(out, "content.tone", content.tone());
+        appendCanonical(out, "content.density", content.density());
+        appendCanonical(out, "content.headlineStyle", content.headlineStyle());
+        appendCanonical(out, "content.headlineMaxChars", Integer.toString(content.headlineMaxChars()));
+        appendCanonical(out, "content.itemTitleMaxChars", Integer.toString(content.itemTitleMaxChars()));
+        appendCanonical(out, "content.itemBodyMaxChars", Integer.toString(content.itemBodyMaxChars()));
+
+        List<String> allowed = new ArrayList<>(layouts.allowedLayouts());
+        allowed.sort(String::compareTo);
+        appendCanonical(out, "layouts.allowed.count", Integer.toString(allowed.size()));
+        for (int i = 0; i < allowed.size(); i++) {
+            appendCanonical(out, "layouts.allowed." + i, allowed.get(i));
+        }
+
+        appendCanonical(out, "layouts.preferred.count", Integer.toString(layouts.preferredLayouts().size()));
+        for (int i = 0; i < layouts.preferredLayouts().size(); i++) {
+            appendCanonical(out, "layouts.preferred." + i, layouts.preferredLayouts().get(i));
+        }
+        appendCanonical(out, "layouts.maxItemsPerPage", Integer.toString(layouts.maxItemsPerPage()));
+
+        TreeMap<String, String> canonicalTokens = new TreeMap<>(tokens);
+        appendCanonical(out, "tokens.count", Integer.toString(canonicalTokens.size()));
+        for (Map.Entry<String, String> entry : canonicalTokens.entrySet()) {
+            appendCanonical(out, "token." + entry.getKey(), entry.getValue());
+        }
+
+        appendCanonical(out, "css", css);
+        appendCanonical(out, "plannerGuidance", plannerGuidance);
+        return out.toString();
+    }
+
+    private static void appendCanonical(StringBuilder out, String field, String value) {
+        String canonicalField = normalizeCanonical(field);
+        String canonicalValue = normalizeCanonical(value == null ? "" : value);
+        out.append(canonicalField.length()).append(':').append(canonicalField)
+                .append(canonicalValue.length()).append(':').append(canonicalValue).append('\n');
+    }
+
+    private static String normalizeCanonical(String value) {
+        return Normalizer.normalize(normalizeLineEndings(value), Normalizer.Form.NFC);
+    }
+
+    private static String normalizeLineEndings(String value) {
+        return value.replace("\r\n", "\n").replace('\r', '\n');
+    }
+
+    private static List<String> normalizeTags(List<String> values) {
+        if (values == null || values.isEmpty()) {
+            return List.of();
+        }
+        List<String> result = new ArrayList<>(values.size());
+        Set<String> seen = new TreeSet<>();
+        for (String tag : values) {
+            String normalized = requireText(tag, "tag");
+            if (!seen.add(normalized)) {
+                throw new IllegalArgumentException("duplicate template tag: " + normalized);
+            }
+            result.add(normalized);
+        }
+        return List.copyOf(result);
+    }
+
+    private static void assertSafeCssFragment(String value, String field, boolean allowDeclarations) {
+        String normalized = normalizeCanonical(value);
+        String lower = normalized.toLowerCase(Locale.ROOT);
+
+        if (normalized.indexOf('\0') >= 0 || normalized.indexOf('\\') >= 0
+                || lower.contains("</style") || lower.contains("url(")
+                || lower.contains("expression(") || lower.contains("image-set(")
+                || lower.contains("src(") || lower.contains("http:")
+                || lower.contains("https:") || lower.contains("file:")
+                || lower.contains("javascript:") || lower.contains("data:")
+                || lower.contains("@")) {
+            throw new IllegalArgumentException(field + " contains a forbidden CSS/network construct");
+        }
+
+        if (!allowDeclarations && (normalized.contains(";") || normalized.contains("{") || normalized.contains("}"))) {
+            throw new IllegalArgumentException(field + " must be a single CSS token value");
+        }
+    }
+
+    private static String sha256(String value) {
+        try {
+            byte[] digest = MessageDigest.getInstance("SHA-256")
+                    .digest(value.getBytes(StandardCharsets.UTF_8));
+            return HexFormat.of().formatHex(digest);
+        }
+        catch (NoSuchAlgorithmException e) {
+            throw new IllegalStateException("SHA-256 is unavailable", e);
+        }
     }
 
     private static String requireText(String value, String field) {
