@@ -1,0 +1,38 @@
+id: article_card_composer
+version: 1.0.0
+runtime:
+  language: java
+  springAi: "1.1.7"
+purpose: >
+  Transform article-like source content into a structured multi-page social card deck
+  and deterministic HTML for downstream fixed-size screenshot rendering.
+entrypoints:
+  agentTool:
+    name: article_card_composer
+    javaType: com.crazycola.html.articlecard.ArticleCardTools
+  service:
+    javaType: com.crazycola.html.articlecard.ArticleCardSkill
+contracts:
+  request: com.crazycola.html.articlecard.ArticleCardContracts.ArticleCardRequest
+  deck: com.crazycola.html.articlecard.ArticleCardContracts.CardDeck
+  result: com.crazycola.html.articlecard.ArticleCardContracts.ArticleCardResult
+schemas:
+  input: schemas/article-card-input.schema.json
+  output: schemas/article-card-output.schema.json
+defaults:
+  minPages: 3
+  maxPages: 8
+  width: 1080
+  height: 1440
+  language: zh-CN
+  allowRewrite: true
+rendering:
+  pageSelector: .card-page
+  deterministic: true
+  screenshotResponsibility: downstream
+layouts:
+  - headline-list
+  - numbered-grid
+  - statement
+  - steps
+  - comparison
