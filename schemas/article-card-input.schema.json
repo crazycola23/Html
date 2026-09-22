@@ -17,6 +17,19 @@
     "width": { "type": ["integer", "null"], "minimum": 320, "maximum": 4096, "default": 1080 },
     "height": { "type": ["integer", "null"], "minimum": 320, "maximum": 4096, "default": 1440 },
     "allowRewrite": { "type": ["boolean", "null"], "default": true },
-    "language": { "type": ["string", "null"], "default": "zh-CN" }
+    "language": { "type": ["string", "null"], "default": "zh-CN" },
+    "templateId": {
+      "type": ["string", "null"],
+      "description": "Template family id. Omit to use the globally pinned default."
+    },
+    "templateVersion": {
+      "type": ["string", "null"],
+      "description": "Exact immutable template version. Recommended for reproducible jobs."
+    },
+    "templateFingerprint": {
+      "type": ["string", "null"],
+      "pattern": "^[0-9a-fA-F]{64}$",
+      "description": "Optional expected SHA-256 fingerprint. Mismatch fails fast."
+    }
   }
 }

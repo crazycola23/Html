@@ -3,15 +3,25 @@
   "$id": "article-card-output.schema.json",
   "title": "ArticleCardResult",
   "type": "object",
-  "required": ["skill", "skillVersion", "deck", "render", "warnings"],
+  "required": ["skill", "skillVersion", "template", "deck", "render", "warnings"],
   "properties": {
     "skill": { "const": "article_card_composer" },
     "skillVersion": { "type": "string" },
+    "template": {
+      "type": "object",
+      "required": ["id", "version", "fingerprint", "displayName"],
+      "properties": {
+        "id": { "type": "string" },
+        "version": { "type": "string" },
+        "fingerprint": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "displayName": { "type": "string" }
+      }
+    },
     "deck": {
       "type": "object",
       "required": ["deckTitle", "pages"],
       "properties": {
-        "deckTitle": { "type": "string" },
+        "deckTitle": { "type": "string", "minLength": 1 },
         "pages": {
           "type": "array",
           "items": {

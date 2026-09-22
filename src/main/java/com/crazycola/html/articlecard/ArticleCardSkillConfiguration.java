@@ -1,5 +1,6 @@
 package com.crazycola.html.articlecard;
 
+import java.util.List;
 import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -23,11 +24,27 @@ public class ArticleCardSkillConfiguration {
     }
 
     @Bean
+    BuiltInCardTemplateProvider builtInCardTemplateProvider() {
+        return new BuiltInCardTemplateProvider();
+    }
+
+    @Bean
+    CardTemplateRegistry cardTemplateRegistry(List<CardTemplateProvider> providers) {
+        return new CardTemplateRegistry(providers);
+    }
+
+    @Bean
+    CardTemplateSelector cardTemplateSelector(CardTemplateRegistry registry) {
+        return CardTemplateSelector.deterministic(registry);
+    }
+
+    @Bean
     ArticleCardSkill articleCardSkill(
             ArticleCardPlanner planner,
             CardDeckValidator validator,
-            CardHtmlRenderer renderer) {
-        return new ArticleCardSkill(planner, validator, renderer);
+            CardHtmlRenderer renderer,
+            CardTemplateSelector templateSelector) {
+        return new ArticleCardSkill(planner, validator, renderer, templateSelector);
     }
 
     @Bean

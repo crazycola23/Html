@@ -1,0 +1,17 @@
+.card-page{
+  background:
+    linear-gradient(rgba(184,97,66,.028) 1px,transparent 1px),
+    linear-gradient(90deg,rgba(184,97,66,.024) 1px,transparent 1px),
+    var(--ac-bg);
+  background-size:100% 42px,42px 100%,auto
+}
+.card-page::after{
+  width:260px;height:260px;border-radius:0;transform:rotate(12deg);
+  border-color:rgba(184,97,66,.2);right:-120px;top:-120px
+}
+.card-meta{letter-spacing:.04em;text-transform:none}
+.headline{font-weight:760;letter-spacing:-.025em}
+.card-item{box-shadow:0 12px 28px rgba(70,52,38,.055)}
+.eyebrow{font-weight:650}
+.card-page[data-layout="statement"] .headline{font-weight:720;max-width:90%}
+.summary{font-style:italic}

@@ -15,7 +15,22 @@ public final class ArticleCardContracts {
             Integer width,
             Integer height,
             Boolean allowRewrite,
-            String language) {
+            String language,
+            String templateId,
+            String templateVersion,
+            String templateFingerprint) {
+
+        public ArticleCardRequest(
+                String content,
+                String title,
+                Integer minPages,
+                Integer maxPages,
+                Integer width,
+                Integer height,
+                Boolean allowRewrite,
+                String language) {
+            this(content, title, minPages, maxPages, width, height, allowRewrite, language, null, null, null);
+        }
 
         public ArticleCardRequest normalized() {
             if (content == null || content.isBlank()) {
@@ -27,7 +42,7 @@ public final class ArticleCardContracts {
             int w = width == null ? 1080 : width;
             int h = height == null ? 1440 : height;
             boolean rewrite = allowRewrite == null || allowRewrite;
-            String lang = language == null || language.isBlank() ? "zh-CN" : language;
+            String lang = language == null || language.isBlank() ? "zh-CN" : language.trim();
 
             if (min < 1 || min > 12) {
                 throw new IllegalArgumentException("minPages must be between 1 and 12");
@@ -42,7 +57,18 @@ public final class ArticleCardContracts {
                 throw new IllegalArgumentException("width/height must be between 320 and 4096");
             }
 
-            return new ArticleCardRequest(content.trim(), blankToNull(title), min, max, w, h, rewrite, lang);
+            return new ArticleCardRequest(
+                    content.trim(),
+                    blankToNull(title),
+                    min,
+                    max,
+                    w,
+                    h,
+                    rewrite,
+                    lang,
+                    blankToNull(templateId),
+                    blankToNull(templateVersion),
+                    blankToNull(templateFingerprint));
         }
 
         private static String blankToNull(String value) {
@@ -72,6 +98,13 @@ public final class ArticleCardContracts {
             List<CardPage> pages) {
     }
 
+    public record TemplateSnapshot(
+            String id,
+            String version,
+            String fingerprint,
+            String displayName) {
+    }
+
     public record RenderResult(
             int width,
             int height,
@@ -83,6 +116,7 @@ public final class ArticleCardContracts {
     public record ArticleCardResult(
             String skill,
             String skillVersion,
+            TemplateSnapshot template,
             CardDeck deck,
             RenderResult render,
             List<String> warnings) {

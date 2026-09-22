@@ -6,5 +6,7 @@
   "width": 1080,
   "height": 1440,
   "allowRewrite": true,
-  "language": "zh-CN"
+  "language": "zh-CN",
+  "templateId": "editorial-dark",
+  "templateVersion": "1.0.0"
 }

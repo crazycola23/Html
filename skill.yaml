@@ -1,11 +1,11 @@
 id: article_card_composer
-version: 1.0.0
+version: 1.1.0
 runtime:
   language: java
   springAi: "1.1.7"
 purpose: >
   Transform article-like source content into a structured multi-page social card deck
-  and deterministic HTML for downstream fixed-size screenshot rendering.
+  and deterministic, versioned-template HTML for downstream fixed-size screenshot rendering.
 entrypoints:
   agentTool:
     name: article_card_composer
@@ -16,9 +16,11 @@ contracts:
   request: com.crazycola.html.articlecard.ArticleCardContracts.ArticleCardRequest
   deck: com.crazycola.html.articlecard.ArticleCardContracts.CardDeck
   result: com.crazycola.html.articlecard.ArticleCardContracts.ArticleCardResult
+  template: com.crazycola.html.articlecard.CardTemplate
 schemas:
   input: schemas/article-card-input.schema.json
   output: schemas/article-card-output.schema.json
+  template: schemas/card-template.schema.json
 defaults:
   minPages: 3
   maxPages: 8
@@ -26,6 +28,17 @@ defaults:
   height: 1440
   language: zh-CN
   allowRewrite: true
+  templateId: editorial-dark
+  templateVersion: "1.0.0"
+templates:
+  selection: deterministic
+  versionPolicy: immutable
+  fingerprint: sha256
+  providerInterface: com.crazycola.html.articlecard.CardTemplateProvider
+  builtIns:
+    - editorial-dark@1.0.0
+    - warm-paper@1.0.0
+    - neo-grid@1.0.0
 rendering:
   pageSelector: .card-page
   deterministic: true

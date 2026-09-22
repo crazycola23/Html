@@ -6,20 +6,19 @@ import com.crazycola.html.articlecard.ArticleCardContracts.CardItem;
 import com.crazycola.html.articlecard.ArticleCardContracts.CardPage;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Set;
 
 public final class CardDeckValidator {
 
-    private static final Set<String> LAYOUTS = Set.of(
-            "headline-list",
-            "numbered-grid",
-            "statement",
-            "steps",
-            "comparison");
-
     public List<String> validate(CardDeck deck, ArticleCardRequest request) {
+        return validate(deck, request, BuiltInCardTemplateProvider.editorialDark());
+    }
+
+    public List<String> validate(CardDeck deck, ArticleCardRequest request, CardTemplate template) {
         if (deck == null || deck.pages() == null) {
             throw new IllegalArgumentException("deck/pages must not be null");
+        }
+        if (deck.deckTitle() == null || deck.deckTitle().isBlank()) {
+            throw new IllegalArgumentException("deckTitle must not be blank");
         }
 
         int count = deck.pages().size();
@@ -38,14 +37,21 @@ public final class CardDeckValidator {
             if (page.headline() == null || page.headline().isBlank()) {
                 throw new IllegalArgumentException("page " + (i + 1) + " headline must not be blank");
             }
-            if (page.layout() == null || !LAYOUTS.contains(page.layout())) {
+            if (page.layout() == null || !template.layouts().allowedLayouts().contains(page.layout())) {
                 throw new IllegalArgumentException(
-                        "page " + (i + 1) + " has unsupported layout: " + page.layout());
+                        "page " + (i + 1) + " has unsupported layout for template "
+                                + template.ref() + ": " + page.layout());
             }
 
             List<CardItem> items = page.items() == null ? List.of() : page.items();
-            if (items.size() > 6) {
-                throw new IllegalArgumentException("page " + (i + 1) + " has more than 6 items");
+            if (items.size() > template.layouts().maxItemsPerPage()) {
+                throw new IllegalArgumentException(
+                        "page " + (i + 1) + " has more than "
+                                + template.layouts().maxItemsPerPage() + " items");
+            }
+            if ("statement".equals(page.layout()) && !items.isEmpty()) {
+                throw new IllegalArgumentException(
+                        "page " + (i + 1) + " uses statement layout and must not contain items");
             }
 
             for (int itemIndex = 0; itemIndex < items.size(); itemIndex++) {
@@ -54,16 +60,30 @@ public final class CardDeckValidator {
                     throw new IllegalArgumentException(
                             "page " + (i + 1) + " item " + (itemIndex + 1) + " title must not be blank");
                 }
-                if (item.body() != null && item.body().length() > 140) {
+                if (length(item.title()) > template.content().itemTitleMaxChars()) {
                     warnings.add("page " + (i + 1) + " item " + (itemIndex + 1)
-                            + " body is long for a fixed-size card");
+                            + " title exceeds template target of "
+                            + template.content().itemTitleMaxChars() + " chars");
+                }
+                if (item.body() != null && length(item.body()) > template.content().itemBodyMaxChars()) {
+                    warnings.add("page " + (i + 1) + " item " + (itemIndex + 1)
+                            + " body exceeds template target of "
+                            + template.content().itemBodyMaxChars() + " chars");
                 }
             }
 
-            if (page.headline().length() > 70) {
-                warnings.add("page " + (i + 1) + " headline is long for a fixed-size card");
+            if (length(page.headline()) > template.content().headlineMaxChars()) {
+                warnings.add("page " + (i + 1) + " headline exceeds template target of "
+                        + template.content().headlineMaxChars() + " chars");
             }
         }
         return List.copyOf(warnings);
+    }
+
+    private static int length(String value) {
+        if (value == null) {
+            return 0;
+        }
+        return value.codePointCount(0, value.length());
     }
 }
