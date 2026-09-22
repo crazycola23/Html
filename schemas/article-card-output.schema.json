@@ -1,0 +1,64 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "article-card-output.schema.json",
+  "title": "ArticleCardResult",
+  "type": "object",
+  "required": ["skill", "skillVersion", "deck", "render", "warnings"],
+  "properties": {
+    "skill": { "const": "article_card_composer" },
+    "skillVersion": { "type": "string" },
+    "deck": {
+      "type": "object",
+      "required": ["deckTitle", "pages"],
+      "properties": {
+        "deckTitle": { "type": "string" },
+        "pages": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["index", "layout", "headline", "items"],
+            "properties": {
+              "index": { "type": "integer", "minimum": 1 },
+              "layout": {
+                "enum": ["headline-list", "numbered-grid", "statement", "steps", "comparison"]
+              },
+              "eyebrow": { "type": ["string", "null"] },
+              "headline": { "type": "string" },
+              "subheadline": { "type": ["string", "null"] },
+              "items": {
+                "type": "array",
+                "maxItems": 6,
+                "items": {
+                  "type": "object",
+                  "required": ["title"],
+                  "properties": {
+                    "number": { "type": ["string", "null"] },
+                    "title": { "type": "string" },
+                    "body": { "type": ["string", "null"] },
+                    "emphasis": { "type": ["string", "null"] }
+                  }
+                }
+              },
+              "summary": { "type": ["string", "null"] }
+            }
+          }
+        }
+      }
+    },
+    "render": {
+      "type": "object",
+      "required": ["width", "height", "pageCount", "pageSelector", "html"],
+      "properties": {
+        "width": { "type": "integer" },
+        "height": { "type": "integer" },
+        "pageCount": { "type": "integer" },
+        "pageSelector": { "const": ".card-page" },
+        "html": { "type": "string" }
+      }
+    },
+    "warnings": {
+      "type": "array",
+      "items": { "type": "string" }
+    }
+  }
+}
